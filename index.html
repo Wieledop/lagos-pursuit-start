@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="description" content="Pursuit-race start display for Lagos Yacht Club with per-class start times and automatic flag and sound cues.">
+<meta name="theme-color" content="#1a2352">
+<title>Lagos Pursuit Start</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=JetBrains+Mono:wght@500;700&family=Public+Sans:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    --bg:#eef3f7;
+    --surface:#ffffff;
+    --surface-2:#dbe7f0;
+    --bezel:#c7d7e3;
+    --ink:#0b1b2b;
+    --ink-muted:#54697c;
+    --accent:#1b5fa8;
+    --accent-strong:#123f73;
+    --accent-soft:#dbe9f7;
+    --on-accent:#ffffff;
+    --warn:#b23f10;
+    --good:#237a52;
+    --line:#c3d4e1;
+    --led-bg:#081018;
+    --led-bg-2:#0d1c28;
+    --led-fg:#bfe6ff;
+    --led-fg-dim:#3d6279;
+    --led-amber:#ffb35c;
+    --burgee-navy:#1a2352;
+    --burgee-red:#c53a52;
+    --burgee-green:#2a8f52;
+    --shadow: 0 1px 0 rgba(11,27,43,0.04), 0 12px 28px -16px rgba(11,27,43,0.35);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#081422;
+      --surface:#0f2438;
+      --surface-2:#16334c;
+      --bezel:#0a1c2c;
+      --ink:#eaf2f8;
+      --ink-muted:#8ca3b8;
+      --accent:#4da3ff;
+      --accent-strong:#8fc4ff;
+      --accent-soft:#173654;
+      --on-accent:#04182b;
+      --warn:#ff8a5b;
+      --good:#4bd68c;
+      --line:#1f425e;
+      --shadow: 0 1px 0 rgba(0,0,0,0.3), 0 20px 40px -20px rgba(0,0,0,0.6);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#081422;
+    --surface:#0f2438;
+    --surface-2:#16334c;
+    --bezel:#0a1c2c;
+    --ink:#eaf2f8;
+    --ink-muted:#8ca3b8;
+    --accent:#4da3ff;
+    --accent-strong:#8fc4ff;
+    --accent-soft:#173654;
+    --on-accent:#04182b;
+    --warn:#ff8a5b;
+    --good:#4bd68c;
+    --line:#1f425e;
+    --shadow: 0 1px 0 rgba(0,0,0,0.3), 0 20px 40px -20px rgba(0,0,0,0.6);
+  }
+
+  *{ box-sizing:border-box; }
+  [hidden]{ display:none !important; }
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Public Sans', system-ui, sans-serif;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding:28px 16px 32px;
+  }
+  .sheet{
+    width:100%;
+    max-width:640px;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+
+  /* ---------- Header ---------- */
+  .header{ display:flex; align-items:flex-start; gap:12px; }
+  .crest{ flex:none; }
+  .crest svg{ display:block; width:54px; height:auto; }
+  .wordmark{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .wordmark h1{
+    margin:0;
+    font-family:'Oswald', sans-serif;
+    font-weight:700;
+    font-size:clamp(1.05rem, 5vw, 1.7rem);
+    letter-spacing:0.03em;
+    text-transform:uppercase;
+    text-wrap:balance;
+    line-height:1.1;
+  }
+  .wordmark p{
+    margin:0;
+    font-size:0.68rem;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:var(--ink-muted);
+    font-weight:600;
+  }
+  .wallclock{ flex:none; margin-left:auto; text-align:right; padding-top:2px; }
+  .wallclock .wc-label{
+    font-size:0.6rem;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--ink-muted);
+    font-weight:600;
+  }
+  .wallclock .wc-time{
+    font-family:'JetBrains Mono', monospace;
+    font-weight:600;
+    font-size:0.85rem;
+    font-variant-numeric:tabular-nums;
+    color:var(--ink);
+    white-space:nowrap;
+  }
+
+  /* ---------- Toolbar ---------- */
+  .toolbar{ display:flex; align-items:center; gap:8px; }
+  .state{
+    margin-right:auto;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    font-size:0.7rem;
+    font-weight:700;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--ink-muted);
+  }
+  .state::before{
+    content:"";
+    width:9px; height:9px;
+    border-radius:50%;
+    background:var(--ink-muted);
+    opacity:0.5;
+  }
+  .state.on{ color:var(--good); }
+  .state.on::before{ background:var(--good); opacity:1; }
+
+  /* ---------- Buttons ---------- */
+  button{
+    font-family:'Public Sans', sans-serif;
+    font-weight:700;
+    font-size:0.85rem;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    border-radius:9px;
+    border:1px solid transparent;
+    padding:11px 18px;
+    cursor:pointer;
+    transition:background 120ms ease, transform 80ms ease, opacity 120ms ease;
+  }
+  button:active{ transform:translateY(1px); }
+  button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .btn-primary{ background:var(--accent); color:var(--on-accent); }
+  .btn-primary:hover{ background:var(--accent-strong); }
+  .btn-primary:disabled{ opacity:0.45; cursor:not-allowed; }
+  .btn-ghost{ background:transparent; border-color:var(--line); color:var(--ink); }
+  .btn-ghost:hover{ background:var(--surface-2); }
+  .btn-ghost:disabled{ opacity:0.4; cursor:not-allowed; }
+  .icon-btn{
+    display:flex; align-items:center; justify-content:center;
+    width:40px; height:40px; padding:0; flex:none;
+    border-radius:9px; border:1px solid var(--line);
+    background:var(--surface-2); color:var(--ink);
+  }
+  .icon-btn svg{ width:18px; height:18px; }
+
+  /* ---------- Cards ---------- */
+  .card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:14px 16px;
+    box-shadow:var(--shadow);
+  }
+  .card-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+  .card h2{
+    margin:0;
+    font-family:'Oswald', sans-serif;
+    font-weight:600;
+    font-size:1.05rem;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+  }
+  .count{
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.8rem;
+    font-weight:600;
+    color:var(--ink-muted);
+    font-variant-numeric:tabular-nums;
+  }
+  .card-sub{ margin:4px 0 12px; font-size:0.78rem; color:var(--ink-muted); line-height:1.45; }
+
+  /* ---------- Start list ---------- */
+  .rows{ display:flex; flex-direction:column; gap:8px; }
+  .row{ display:flex; align-items:center; gap:8px; }
+  .in-name, .in-time{
+    min-width:0;
+    height:44px;
+    font-size:1rem;
+    color:var(--ink);
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    border-radius:9px;
+    padding:0 10px;
+  }
+  .in-name{ flex:1; font-family:'Public Sans', sans-serif; font-weight:600; }
+  .in-name::placeholder{ color:var(--ink-muted); font-weight:500; }
+  .in-time{ flex:none; width:8.1rem; font-family:'JetBrains Mono', monospace; font-weight:600; }
+  .btn-add{
+    margin-top:10px;
+    width:100%;
+    background:transparent;
+    border:1px dashed var(--ink-muted);
+    color:var(--ink);
+    padding:12px;
+  }
+  .btn-add:hover{ background:var(--surface-2); }
+  .btn-add:disabled{ opacity:0.45; cursor:not-allowed; }
+
+  .gobar{
+    position:sticky;
+    bottom:0;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding:12px 0 calc(12px + env(safe-area-inset-bottom));
+    background:linear-gradient(to top, var(--bg) 72%, transparent);
+  }
+  .gobar-info{ flex:1; min-width:0; font-size:0.8rem; line-height:1.35; font-weight:600; color:var(--ink-muted); }
+  .gobar-info.err{ color:var(--warn); }
+  .btn-go{ flex:none; padding:14px 34px; font-size:1rem; }
+
+  .runview{ display:flex; flex-direction:column; gap:16px; }
+
+  /* ---------- Instrument panel ---------- */
+  .panel{
+    background:linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
+    border:1px solid var(--bezel);
+    border-radius:20px;
+    padding:20px 18px 18px;
+    box-shadow:var(--shadow);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:12px;
+  }
+  .next-head{ display:flex; flex-direction:column; align-items:center; gap:4px; text-align:center; max-width:100%; }
+  .next-label{
+    font-size:0.7rem;
+    letter-spacing:0.16em;
+    text-transform:uppercase;
+    color:var(--ink-muted);
+    font-weight:700;
+  }
+  .next-class{
+    font-family:'Oswald', sans-serif;
+    font-weight:600;
+    font-size:clamp(1.5rem, 7vw, 2.3rem);
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    line-height:1.1;
+    text-wrap:balance;
+    overflow-wrap:anywhere;
+  }
+  .next-meta{
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.82rem;
+    font-weight:600;
+    color:var(--ink-muted);
+    font-variant-numeric:tabular-nums;
+  }
+  .clock{
+    font-family:'JetBrains Mono', monospace;
+    font-weight:700;
+    font-size:clamp(3.4rem, 19vw, 6.5rem);
+    line-height:1;
+    letter-spacing:0.01em;
+    font-variant-numeric:tabular-nums;
+    color:var(--ink);
+  }
+  .clock.long{ font-size:clamp(2.4rem, 14vw, 4.8rem); }
+  .clock.is-started{ color:var(--good); }
+
+  .flagrow{ display:flex; flex-wrap:wrap; justify-content:center; gap:8px; }
+  .flagchip{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:6px 14px 6px 8px;
+  }
+  .flagchip svg{ display:block; }
+  .flagchip span{
+    font-size:0.72rem;
+    font-weight:700;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    color:var(--ink-muted);
+  }
+  .flagchip--class{ --flag-accent: var(--led-amber); }
+  .flagchip--p{ --flag-accent: var(--accent); }
+  .flag-pole{ stroke:var(--ink-muted); stroke-width:2.5; }
+  .flag-cloth{ fill:var(--ink-muted); opacity:0.35; transition:fill 260ms ease, opacity 260ms ease; }
+  .flag-square{ fill:#fff; opacity:0; transition:opacity 260ms ease; }
+  .flagchip.up .flag-cloth{ fill:var(--flag-accent); opacity:1; }
+  .flagchip.up .flag-square{ opacity:1; }
+  .flagchip.up span{ color:var(--ink); }
+  .flagchip.down .flag-cloth{ fill:var(--ink-muted); opacity:0.35; }
+  .flagchip.down .flag-square{ opacity:0; }
+
+  .led{
+    width:100%;
+    background:var(--led-bg);
+    background-image:radial-gradient(circle at 50% -20%, var(--led-bg-2), var(--led-bg) 70%);
+    border-radius:12px;
+    border:1px solid #000;
+    padding:16px 14px;
+    min-height:92px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    box-shadow:inset 0 2px 10px rgba(0,0,0,0.6);
+  }
+  .led-text{
+    font-family:'Oswald', sans-serif;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    font-size:clamp(1rem, 4.2vw, 1.4rem);
+    color:var(--led-fg-dim);
+    line-height:1.4;
+    white-space:pre-line;
+    overflow-wrap:anywhere;
+    transition:color 150ms ease, text-shadow 150ms ease;
+  }
+  .led-text.lit{
+    color:var(--led-fg);
+    text-shadow:0 0 6px rgba(191,230,255,0.55), 0 0 18px rgba(191,230,255,0.25);
+  }
+  .led-text.lit.warn{
+    color:var(--led-amber);
+    text-shadow:0 0 6px rgba(255,179,92,0.55), 0 0 18px rgba(255,179,92,0.25);
+  }
+
+  /* ---------- Schedule ---------- */
+  .sched-card{ padding:12px 8px 8px; }
+  .sched-card h2{ padding:0 8px 8px; }
+  .sched{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; }
+  .srow{
+    display:grid;
+    grid-template-columns:5.2rem 1fr auto;
+    align-items:center;
+    gap:10px;
+    padding:10px 8px;
+    border-top:1px solid var(--line);
+    border-radius:10px;
+  }
+  .srow:first-child{ border-top-color:transparent; }
+  .stime{
+    font-family:'JetBrains Mono', monospace;
+    font-weight:600;
+    font-size:0.9rem;
+    font-variant-numeric:tabular-nums;
+  }
+  .sname{ font-weight:600; font-size:0.95rem; overflow-wrap:anywhere; }
+  .chip{
+    font-size:0.62rem;
+    font-weight:700;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    padding:4px 9px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-muted);
+    white-space:nowrap;
+  }
+  .srow.done .stime, .srow.done .sname{ color:var(--ink-muted); }
+  .srow.done .chip{ color:var(--good); border-color:var(--good); }
+  .srow.done.passed .chip{ color:var(--ink-muted); border-color:var(--line); }
+  .srow.next{ background:var(--accent-soft); border-top-color:transparent; }
+  .srow.next + .srow{ border-top-color:transparent; }
+  .srow.next .chip{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
+
+  .hint{
+    text-align:center;
+    font-size:0.76rem;
+    color:var(--ink-muted);
+    line-height:1.5;
+    padding:0 8px;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition-duration:0.001ms !important; }
+  }
+
+  @media (max-width:480px){
+    body{ padding:16px 10px 20px; }
+    .sheet, .runview{ gap:12px; }
+    .header{ gap:8px; }
+    .crest svg{ width:44px; }
+    .wallclock .wc-time{ font-size:0.75rem; }
+    .card{ padding:12px 12px; }
+    .sched-card{ padding:10px 4px 6px; }
+    .in-time{ width:7.4rem; padding:0 6px; }
+    .panel{ padding:16px 12px 14px; border-radius:16px; gap:10px; }
+    .clock{ font-size:clamp(2.8rem, 21vw, 4.5rem); }
+    .clock.long{ font-size:clamp(2.2rem, 14vw, 3.6rem); }
+    .led{ padding:12px 10px; min-height:80px; }
+    .srow{ grid-template-columns:4.3rem 1fr auto; gap:8px; }
+    .btn-go{ padding:14px 28px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="sheet">
+
+  <div class="header">
+    <div class="crest">
+      <svg viewBox="0 0 415 235" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <clipPath id="pennantClip">
+            <path d="M0,0 L415,117.5 L0,235 Z"/>
+          </clipPath>
+        </defs>
+        <path d="M0,0 L415,117.5 L0,235 Z" fill="var(--burgee-navy)"/>
+        <g clip-path="url(#pennantClip)">
+          <rect x="100" y="0" width="50" height="235" fill="var(--burgee-red)"/>
+          <rect x="0" y="94" width="415" height="47" fill="var(--burgee-red)"/>
+        </g>
+        <polygon points="125,72.5 163.97,140 86.03,140" fill="none" stroke="var(--burgee-green)" stroke-width="5" stroke-linejoin="round"/>
+        <polygon points="163.97,95 125,162.5 86.03,95" fill="none" stroke="var(--burgee-green)" stroke-width="5" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="wordmark">
+      <h1>Lagos Yacht Club</h1>
+      <p>Race Committee &middot; Pursuit Start</p>
+    </div>
+    <div class="wallclock">
+      <div class="wc-label">Now</div>
+      <div class="wc-time" id="wallClock">&#8211;&#8211;:&#8211;&#8211;:&#8211;&#8211;</div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="state" id="stateLabel">Setup</div>
+    <button class="icon-btn" id="soundBtn" title="Mute" aria-label="Toggle sound"></button>
+    <button class="btn-ghost" id="resetBtn" hidden>Reset</button>
+  </div>
+
+  <section class="card" id="setupView">
+    <div class="card-head">
+      <h2>Start list</h2>
+      <span class="count" id="count">0 / 12</span>
+    </div>
+    <p class="card-sub" id="setupSub"></p>
+    <div class="rows" id="rows"></div>
+    <button class="btn-add" id="addBtn" type="button">+ Add class</button>
+  </section>
+
+  <div class="gobar" id="goBar">
+    <div class="gobar-info" id="goInfo"></div>
+    <button class="btn-primary btn-go" id="goBtn" type="button">Go</button>
+  </div>
+
+  <div class="runview" id="runView" hidden>
+      <div class="panel">
+        <div class="next-head">
+          <div class="next-label" id="nextLabel">Next start</div>
+          <div class="next-class" id="nextClass"></div>
+          <div class="next-meta" id="nextMeta"></div>
+        </div>
+        <div class="clock" id="clock">0:00</div>
+        <div class="flagrow">
+          <div class="flagchip flagchip--class" id="classFlagChip">
+            <svg width="22" height="22" viewBox="0 0 22 22">
+              <line class="flag-pole" x1="6" y1="3" x2="6" y2="19"/>
+              <rect class="flag-cloth" x="6" y="4" width="12" height="8"/>
+            </svg>
+            <span id="classFlagLabel">Class flag: standing by</span>
+          </div>
+          <div class="flagchip flagchip--p" id="pFlagChip">
+            <svg width="22" height="22" viewBox="0 0 22 22">
+              <line class="flag-pole" x1="6" y1="3" x2="6" y2="19"/>
+              <rect class="flag-cloth" x="6" y="4" width="12" height="8"/>
+              <rect class="flag-square" x="10.5" y="6" width="3" height="4"/>
+            </svg>
+            <span id="pFlagLabel">P flag: standing by</span>
+          </div>
+        </div>
+        <div class="led">
+          <div class="led-text" id="ledText" aria-live="polite"></div>
+        </div>
+      </div>
+
+      <section class="card sched-card">
+        <h2>Starts</h2>
+        <ol class="sched" id="sched"></ol>
+      </section>
+  </div>
+
+  <div class="hint">Each start runs the full sequence: class flag up at 5 minutes, P flag up at 4, down at 1. When the next start is closer than 5 minutes, its sequence joins from wherever it should be. Your start list is remembered on this device. On phones the screen stays awake while running; turn the volume up before racing.</div>
+
+</div>
+
+<script>
+(function(){
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const MAX_CLASSES = 12;
+  const STORE_KEY = 'lyc-pursuit-list-v1';
+  const MSG_HOLD_MS = 5000;
+
+  const el = {
+    wall: $('wallClock'), state: $('stateLabel'), sound: $('soundBtn'), reset: $('resetBtn'),
+    setup: $('setupView'), sub: $('setupSub'), rows: $('rows'), count: $('count'), add: $('addBtn'),
+    goBar: $('goBar'), goInfo: $('goInfo'), go: $('goBtn'),
+    run: $('runView'), nextLabel: $('nextLabel'), nextClass: $('nextClass'), nextMeta: $('nextMeta'),
+    clock: $('clock'), led: $('ledText'), sched: $('sched'),
+    classChip: $('classFlagChip'), classLabel: $('classFlagLabel'), pChip: $('pFlagChip'), pLabel: $('pFlagLabel')
+  };
+
+  const ICON_ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a9 9 0 0 1 0 12"/></svg>';
+  const ICON_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 5V4L8 9H4z"/><line x1="17" y1="9" x2="22" y2="14"/><line x1="22" y1="9" x2="17" y2="14"/></svg>';
+  const ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>';
+
+  // ---- sound toggle ----
+  let muted = false;
+  try { muted = localStorage.getItem('lyc-muted') === '1'; } catch(e){}
+  function renderSoundIcon(){ el.sound.innerHTML = muted ? ICON_OFF : ICON_ON; el.sound.title = muted ? 'Unmute' : 'Mute'; }
+  renderSoundIcon();
+  el.sound.addEventListener('click', () => {
+    muted = !muted;
+    try { localStorage.setItem('lyc-muted', muted ? '1' : '0'); } catch(e){}
+    renderSoundIcon();
+  });
+
+  // ---- audio ----
+  let audioCtx = null;
+  function ensureAudio(){
+    if (!audioCtx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new Ctx();
+    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  }
+  function beep(freq, durationMs, gain){
+    if (muted || !audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    const now = audioCtx.currentTime;
+    const vol = gain || 0.22;
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(vol, now + 0.015);
+    g.gain.linearRampToValueAtTime(0, now + durationMs/1000);
+    osc.connect(g).connect(audioCtx.destination);
+    osc.start(now);
+    osc.stop(now + durationMs/1000 + 0.02);
+  }
+  const shortBeep = () => beep(880, 280);
+  const startBeep = () => beep(1046, 750, 0.26);
+
+  // ---- state ----
+  let running = false;
+  let groups = [];          // [{ts, names[]}] sorted by start time
+  let idx = 0;              // index of the group currently being counted down to
+  let firstIdx = 0;         // first group that was still in the future at Go
+  let fired = {};
+  let tickHandle = null;
+  let ledExpiry = 0;
+  let ledMode = 'idle';     // idle | msg | warn
+  let flagState = { classFlag:'standing', pFlag:'standing' };
+  let usingExamples = false;
+  let errShown = false;
+
+  // ---- keep screen awake while running ----
+  let wakeLock = null;
+  function requestWakeLock(){
+    if (!('wakeLock' in navigator)) return;
+    navigator.wakeLock.request('screen').then(lock => {
+      wakeLock = lock;
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    }).catch(() => {});
+  }
+  function releaseWakeLock(){
+    if (wakeLock) { wakeLock.release(); wakeLock = null; }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && running && !wakeLock) requestWakeLock();
+  });
+
+  // ---- sequence relative to each start (seconds, ascending) ----
+  const EVENTS = [
+    { t:-300, text:n => n + ': class flag up — 5 minutes to the start', beep:true,  flags:[['classFlag','up']] },
+    { t:-240, text:n => n + ': P flag up — 4 minutes to the start',     beep:true,  flags:[['pFlag','up']] },
+    { t:-120, text:n => n + ': 1 minute to the P flag down',            beep:false, flags:[] },
+    { t:-60,  text:n => n + ': 1 minute to the start',                  beep:true,  flags:[['pFlag','down']] },
+    { t:-30,  text:n => n + ': 30 seconds to the start',                beep:false, flags:[] },
+    { t:-10,  text:n => n + ': 10 seconds to the start',                beep:false, flags:[], hold:1000 },
+    { t:0,    text:n => 'Start — ' + n,                                 beep:true,  flags:[['classFlag','down']], kind:'start' }
+  ];
+
+  // ---- helpers ----
+  function fmtClock(ms){
+    const total = Math.max(0, Math.ceil(ms/1000));
+    const h = Math.floor(total/3600), m = Math.floor((total%3600)/60), s = total%60;
+    const ss = String(s).padStart(2,'0');
+    return h > 0 ? h + ':' + String(m).padStart(2,'0') + ':' + ss : m + ':' + ss;
+  }
+  function fmtTime(ts){ return new Date(ts).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}); }
+  function groupName(g){ return g.names.join(' + '); }
+  function stateWord(s){ return s === 'up' ? 'up' : (s === 'down' ? 'down' : 'standing by'); }
+  function flagStatusLine(){ return 'Class flag: ' + stateWord(flagState.classFlag) + ' · P flag: ' + stateWord(flagState.pFlag); }
+
+  // ---- LED ----
+  function idleText(){
+    if (!running) return '';
+    if (idx >= groups.length) return 'All classes started';
+    return groupName(groups[idx]) + '\n' + flagStatusLine();
+  }
+  function setLed(text, mode, holdMs){
+    el.led.textContent = text;
+    el.led.className = 'led-text' + (mode === 'msg' ? ' lit' : mode === 'warn' ? ' lit warn' : '');
+    ledExpiry = holdMs ? Date.now() + holdMs : 0;
+    ledMode = mode;
+  }
+  function showLedIdle(){
+    el.led.className = 'led-text';
+    el.led.textContent = idleText();
+    ledExpiry = 0;
+    ledMode = 'idle';
+  }
+
+  // ---- flags ----
+  function setFlagState(which, state){
+    flagState[which] = state;
+    const chip = which === 'classFlag' ? el.classChip : el.pChip;
+    const label = which === 'classFlag' ? el.classLabel : el.pLabel;
+    const name = which === 'classFlag' ? 'Class flag' : 'P flag';
+    chip.classList.remove('up','down');
+    if (state === 'up') chip.classList.add('up');
+    else if (state === 'down') chip.classList.add('down');
+    label.textContent = name + ': ' + stateWord(state);
+    if (ledMode === 'idle') showLedIdle();
+  }
+
+  // ---- running view ----
+  function renderNext(){
+    if (idx < groups.length) {
+      const g = groups[idx];
+      el.nextLabel.textContent = 'Next start';
+      el.nextClass.textContent = groupName(g);
+      el.nextMeta.textContent = fmtTime(g.ts) + ' · start ' + (idx + 1) + ' of ' + groups.length;
+      el.clock.classList.remove('is-started');
+    } else {
+      el.nextLabel.textContent = 'Finished';
+      el.nextClass.textContent = 'All classes started';
+      el.nextMeta.textContent = groups.length + (groups.length === 1 ? ' start' : ' starts') + ' completed';
+      el.clock.classList.add('is-started');
+    }
+  }
+  function renderSchedule(){
+    el.sched.textContent = '';
+    groups.forEach((g, i) => {
+      const li = document.createElement('li');
+      li.className = 'srow' + (i < idx ? ' done' : '') + (i < firstIdx ? ' passed' : '') + (i === idx ? ' next' : '');
+      const t = document.createElement('span'); t.className = 'stime'; t.textContent = fmtTime(g.ts);
+      const n = document.createElement('span'); n.className = 'sname'; n.textContent = groupName(g);
+      const c = document.createElement('span'); c.className = 'chip';
+      c.textContent = i < firstIdx ? 'Passed' : i < idx ? 'Started' : i === idx ? 'Next' : 'Waiting';
+      li.append(t, n, c);
+      el.sched.appendChild(li);
+    });
+  }
+
+  // Switch to group i. Signals that fall before `ref` are treated as already past:
+  // they are not replayed, but their flag changes are applied.
+  function enterGroup(i, ref){
+    idx = i;
+    fired = {};
+    if (i < groups.length) {
+      const g = groups[i];
+      const caught = { classFlag:'standing', pFlag:'standing' };
+      EVENTS.forEach(ev => {
+        if (g.ts + ev.t*1000 < ref) {
+          fired['t' + ev.t] = true;
+          ev.flags.forEach(f => { caught[f[0]] = f[1]; });
+        }
+      });
+      setFlagState('classFlag', caught.classFlag);
+      setFlagState('pFlag', caught.pFlag);
+    }
+    renderNext();
+    renderSchedule();
+    if (ledMode === 'idle') showLedIdle();
+  }
+
+  function flush(items){
+    const text = items.map(x => x.text).join('\n');
+    const hold = Math.max.apply(null, items.map(x => x.hold));
+    const anyBeep = items.some(x => x.beep);
+    setLed(text, anyBeep ? 'warn' : 'msg', hold);
+    if (items.some(x => x.start)) startBeep();
+    else if (anyBeep) shortBeep();
+  }
+
+  function tick(){
+    const now = Date.now();
+    const items = [];
+    let guard = 0;
+    while (idx < groups.length && guard++ < 100) {
+      const g = groups[idx];
+      let advanced = false;
+      for (let i = 0; i < EVENTS.length; i++) {
+        const ev = EVENTS[i], key = 't' + ev.t;
+        if (fired[key]) continue;
+        if (now < g.ts + ev.t*1000) break;
+        fired[key] = true;
+        ev.flags.forEach(f => setFlagState(f[0], f[1]));
+        items.push({ text: ev.text(groupName(g)), beep: ev.beep, hold: ev.hold || MSG_HOLD_MS, start: ev.kind === 'start' });
+        if (ev.kind === 'start') { enterGroup(idx + 1, g.ts); advanced = true; break; }
+      }
+      if (!advanced) break;
+    }
+    if (items.length) flush(items);
+
+    const txt = idx < groups.length ? fmtClock(groups[idx].ts - now) : '0:00';
+    el.clock.textContent = txt;
+    el.clock.classList.toggle('long', txt.length > 5);
+
+    if ((ledMode === 'msg' || ledMode === 'warn') && ledExpiry && now >= ledExpiry) showLedIdle();
+  }
+
+  // ---- start list (setup) ----
+  function collectRows(){
+    return Array.from(el.rows.children).map(r => ({
+      name: r.querySelector('.in-name').value.trim(),
+      time: r.querySelector('.in-time').value
+    }));
+  }
+  function tsFor(hhmm){
+    const p = hhmm.split(':');
+    const d = new Date();
+    d.setHours(parseInt(p[0],10), parseInt(p[1],10), 0, 0);
+    return d.getTime();
+  }
+  function save(){
+    if (usingExamples) return;
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(collectRows())); } catch(e){}
+  }
+  function load(){
+    try {
+      const raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return null;
+      const a = JSON.parse(raw);
+      return Array.isArray(a) && a.length ? a.slice(0, MAX_CLASSES) : null;
+    } catch(e){ return null; }
+  }
+  function updateSub(){
+    el.sub.textContent = usingExamples
+      ? 'Example entries — replace them with your own classes and start times.'
+      : 'One row per class, in any order. Classes with the same start time start together.';
+  }
+  function refreshRows(){
+    const n = el.rows.children.length;
+    el.count.textContent = n + ' / ' + MAX_CLASSES;
+    el.add.disabled = n >= MAX_CLASSES;
+    el.add.textContent = n >= MAX_CLASSES ? 'Maximum of 12 classes' : '+ Add class';
+    Array.from(el.rows.children).forEach(r => { r.querySelector('.x').hidden = n === 1; });
+  }
+  function setInfo(msg, warn){
+    el.goInfo.textContent = msg;
+    el.goInfo.classList.toggle('err', !!warn);
+  }
+  function refreshInfo(){
+    if (errShown) return;
+    const withTime = collectRows().filter(r => r.time);
+    if (!withTime.length) { setInfo('Enter a start time for each class.'); return; }
+    const now = Date.now();
+    const upcoming = withTime.map(r => tsFor(r.time)).filter(ts => ts > now).sort((a,b) => a - b);
+    if (!upcoming.length) { setInfo('All start times have already passed.', true); return; }
+    setInfo('First start ' + fmtTime(upcoming[0]) + ' · ' + withTime.length + (withTime.length === 1 ? ' class' : ' classes'));
+  }
+  function onEdit(){
+    usingExamples = false;
+    errShown = false;
+    updateSub();
+    save();
+    refreshRows();
+    refreshInfo();
+  }
+  function addRow(name, time, focus){
+    const row = document.createElement('div');
+    row.className = 'row';
+    const n = document.createElement('input');
+    n.type = 'text'; n.className = 'in-name'; n.placeholder = 'Class name'; n.maxLength = 24;
+    n.value = name || ''; n.autocomplete = 'off'; n.setAttribute('aria-label', 'Class name');
+    const t = document.createElement('input');
+    t.type = 'time'; t.className = 'in-time'; t.value = time || ''; t.setAttribute('aria-label', 'Start time');
+    const x = document.createElement('button');
+    x.type = 'button'; x.className = 'icon-btn x'; x.innerHTML = ICON_X; x.setAttribute('aria-label', 'Remove class');
+    n.addEventListener('input', onEdit);
+    t.addEventListener('input', onEdit);
+    x.addEventListener('click', () => { row.remove(); onEdit(); });
+    row.append(n, t, x);
+    el.rows.appendChild(row);
+    refreshRows();
+    if (focus) n.focus();
+  }
+  el.add.addEventListener('click', () => {
+    if (el.rows.children.length >= MAX_CLASSES) return;
+    addRow('', '', true);
+    onEdit();
+  });
+
+  function loadInitialList(){
+    const saved = load();
+    if (saved) {
+      saved.forEach(r => addRow(r.name || '', r.time || ''));
+      usingExamples = false;
+      return;
+    }
+    const first = Math.ceil((Date.now() + 6*60000) / 60000) * 60000;
+    const examples = [['Optimist', 0], ['Hobie 16', 2], ['Laser', 5], ['Keelboats', 9]];
+    examples.forEach(e => {
+      const d = new Date(first + e[1]*60000);
+      addRow(e[0], String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'));
+    });
+    usingExamples = true;
+  }
+
+  // ---- Go / Reset ----
+  function go(){
+    const list = [];
+    let err = '';
+    collectRows().forEach((r, i) => {
+      if (!r.name && !r.time) return;
+      if (!r.time) { if (!err) err = r.name + ' has no start time.'; return; }
+      list.push({ name: r.name || ('Class ' + (i + 1)), ts: tsFor(r.time) });
+    });
+    const now = Date.now();
+    if (!err && !list.length) err = 'Add at least one class with a start time.';
+    if (!err && !list.some(e => e.ts > now)) err = 'All start times have already passed. Check the times.';
+    if (err) { errShown = true; setInfo(err, true); return; }
+
+    const byTime = new Map();
+    list.sort((a,b) => a.ts - b.ts).forEach(e => {
+      if (!byTime.has(e.ts)) byTime.set(e.ts, []);
+      byTime.get(e.ts).push(e.name);
+    });
+    groups = Array.from(byTime, kv => ({ ts: kv[0], names: kv[1] }));
+    firstIdx = groups.findIndex(g => g.ts > now);
+
+    ensureAudio();
+    requestWakeLock();
+    running = true;
+    flagState = { classFlag:'standing', pFlag:'standing' };
+    showLedIdle();
+
+    el.setup.hidden = true;
+    el.goBar.hidden = true;
+    el.run.hidden = false;
+    el.reset.hidden = false;
+    el.state.textContent = 'Running';
+    el.state.classList.add('on');
+
+    enterGroup(firstIdx, now);
+    tick();
+    tickHandle = setInterval(tick, 200);
+    window.scrollTo(0, 0);
+  }
+
+  function resetAll(){
+    if (tickHandle) { clearInterval(tickHandle); tickHandle = null; }
+    releaseWakeLock();
+    running = false;
+    groups = [];
+    idx = 0;
+    fired = {};
+    ledMode = 'idle';
+    setFlagState('classFlag', 'standing');
+    setFlagState('pFlag', 'standing');
+    el.led.textContent = '';
+    el.setup.hidden = false;
+    el.goBar.hidden = false;
+    el.run.hidden = true;
+    el.reset.hidden = true;
+    el.state.textContent = 'Setup';
+    el.state.classList.remove('on');
+    errShown = false;
+    refreshInfo();
+    window.scrollTo(0, 0);
+  }
+
+  el.go.addEventListener('click', go);
+  el.reset.addEventListener('click', resetAll);
+
+  // ---- wall clock ----
+  function tickWall(){
+    el.wall.textContent = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+    if (!running) refreshInfo();
+  }
+
+  loadInitialList();
+  updateSub();
+  refreshRows();
+  resetAll();
+  tickWall();
+  setInterval(tickWall, 1000);
+})();
+</script>
+</body>
+</html>
